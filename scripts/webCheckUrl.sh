@@ -7,6 +7,9 @@ onlyWorkable="${3:-no}" #En yes, solo alerta los días hábiles.
 proxy="${4:-}"
 ##
 alert="yes"
+## horario laboral
+hasta=20
+desde=8
 
 #Return if today is a workable day.
 function isWorkable () 
@@ -15,26 +18,33 @@ function isWorkable ()
  day=$(env TZ="$timeZone" date '+%d')
  month=$(env TZ="$timeZone" date '+%m')
  year=$(env TZ="$timeZone" date '+%Y')
+ hour=$(env TZ="$timeZone" date '+%H')
  dayOfWeek=$(env TZ="$timeZone" date '+%u')
+
+day=18
+month=4
  
  if [ ! -f /tmp/feriados$year ];then
-  curl --silent --max-time 5 -X GET http://nolaborables.com.ar/api/v2/feriados/2019 |jq ".[] | select((.dia==$day) and .mes==$month)" > /tmp/feriados$year
+  curl --silent --insecure --max-time 5 -X GET "http://nolaborables.com.ar/api/v2/feriados/2019?incluir=opcional"  > /tmp/feriados$year
  fi
- if $proxy cat /tmp/feriados$year |grep motivo > /dev/null ;then
-    echo "feriado"
+ if $proxy cat /tmp/feriados$year |jq ".[] | select((.dia==$day and .mes==$month) and (.religion==\"cristianismo\" or .tipo==\"inamovible\"))"|grep motivo > /dev/null ;then
+    echo "Motivo:feriado"
     alert="no"
  elif ((dayOfWeek > 5));then
-    echo "finde"
+    echo "Motivo:finde de semana"
+    alert="no"
+ elif ((hour > hasta)) || ((hour < desde));then 
+    echo "Motivo:fuera de hora"
     alert="no"
  else 
-    echo "workable"
+    echo "Motivo:Laboral"
     alert="yes"
  fi
 }
 
 if [ "$onlyWorkable" == "yes" ]; then
  #isWorkable $day $month $dayOfWeek 
- echo "solo habiles"
+ echo "solo Alerta días hábiles"
  isWorkable
 fi
 
